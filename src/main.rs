@@ -4,6 +4,9 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
+use std::io::ErrorKind;
+
+
 
 use crossterm::event::{self, Event as CEvent, KeyCode, KeyEvent, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -118,30 +121,57 @@ fn scan_music(music_dir: &Path, cover_out: &Path) -> Vec<Song> {
 
 fn spawn_mpv_with_pipe(music_pipe: &str) -> io::Result<std::process::Child> {
     // start mpv in idle mode with IPC server
-    let child = Command::new("mpv")
+    let child = Command::new(r"C:\Users\HP\Downloads\bootstrapper\mpv.exe")
         .arg("--no-video")
         .arg("--idle=yes")
         .arg(format!("--input-ipc-server={}", music_pipe))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()?;
     Ok(child)
 }
 
-fn connect_pipe_with_retry(pipe_name: &str, tries: usize, delay_ms: u64) -> io::Result<PipeClient> {
+fn connect_pipe_with_retry(
+    pipe_name: &str,
+    tries: usize,
+    delay_ms: u64,
+) -> io::Result<PipeClient> {
     for _ in 0..tries {
         match PipeClient::connect(pipe_name) {
-            Ok(c) => return Ok(c),
-            Err(_) => std::thread::sleep(std::time::Duration::from_millis(delay_ms)),
+            Ok(pipe) => return Ok(pipe),
+            Err(_) => std::thread::sleep(Duration::from_millis(delay_ms)),
         }
     }
-    Err(io::Error::new(io::ErrorKind::Other, "Failed to connect pipe"))
+
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        "Failed to connect pipe",
+    ))
 }
 
-fn send_json_command(pipe: &mut PipeClient, cmd: serde_json::Value) -> io::Result<()> {
-    let s = serde_json::to_vec(&cmd)?;
-    pipe.write_all(&s)?;
-    pipe.write_all(b"\n")?;
-    Ok(())
+
+
+fn send_json_command(
+    pipe: &mut PipeClient,
+    pipe_name: &str,
+    cmd: serde_json::Value,
+) -> io::Result<()> {
+    let data = serde_json::to_vec(&cmd)?;
+    
+    match pipe.write_all(&data).and_then(|_| pipe.write_all(b"\n")) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == ErrorKind::BrokenPipe => {
+            // 🔁 reconnect pipe
+            *pipe = connect_pipe_with_retry(pipe_name, 20, 100)?;
+            pipe.write_all(&data)?;
+            pipe.write_all(b"\n")?;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
+
 
 fn open_with_default(path: &str) {
     // Use cmd start to open with default application
@@ -259,9 +289,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pipe_name = r"\\.\pipe\mpvpipe";
     let _mpv_child = spawn_mpv_with_pipe(pipe_name)
         .map_err(|e| format!("Failed to spawn mpv: {}. Ensure mpv is installed in PATH.", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(1000));
 
     let mut pipe = connect_pipe_with_retry(pipe_name, 20, 100)
         .map_err(|_| "Failed to connect to mpv IPC pipe. Make sure mpv is running with --input-ipc-server.")?;
+
+        // 🔑 REQUIRED ON WINDOWS
+std::thread::sleep(Duration::from_millis(500));
 
     // Setup terminal + input thread
     enable_raw_mode()?;
@@ -293,7 +327,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut repeat = false;
 
     // set initial volume in mpv
-    send_json_command(&mut pipe, json!({"command": ["set_property", "volume", volume]}))?;
+    send_json_command(&mut pipe, pipe_name, json!({"command": ["set_property", "volume", volume]}))?;
 
     // main loop
     loop {
@@ -345,17 +379,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let idx = list_idx;
                     let song = &songs[idx];
                     // loadfile
-                    send_json_command(&mut pipe, json!({"command": ["loadfile", song.path]}))?;
+                    send_json_command(&mut pipe, pipe_name, json!({"command": ["loadfile", song.path]}))?;
                     current_play_idx = Some(idx);
                     playing = true;
-                    send_json_command(&mut pipe, json!({"command": ["set_property", "volume", volume]}))?;
+                    send_json_command(&mut pipe, pipe_name,json!({"command": ["set_property", "volume", volume]}))?;
                 }
                 KeyEvent {
                     code: KeyCode::Char(' '),
                     kind: KeyEventKind::Press,
                     ..
                 } => {
-                    send_json_command(&mut pipe, json!({"command": ["cycle", "pause"]}))?;
+                    send_json_command(&mut pipe, pipe_name, json!({"command": ["cycle", "pause"]}))?;
                     playing = !playing;
                 }
                 KeyEvent {
@@ -366,7 +400,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(idx) = current_play_idx {
                         let next_idx = (idx + 1) % songs.len();
                         let song = &songs[next_idx];
-                        send_json_command(&mut pipe, json!({"command": ["loadfile", song.path]}))?;
+                        send_json_command(&mut pipe, pipe_name, json!({"command": ["loadfile", song.path]}))?;
                         current_play_idx = Some(next_idx);
                         playing = true;
                         list_idx = next_idx;
@@ -381,7 +415,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(idx) = current_play_idx {
                         let prev_idx = if idx == 0 { songs.len() - 1 } else { idx - 1 };
                         let song = &songs[prev_idx];
-                        send_json_command(&mut pipe, json!({"command": ["loadfile", song.path]}))?;
+                        send_json_command(&mut pipe, pipe_name, json!({"command": ["loadfile", song.path]}))?;
                         current_play_idx = Some(prev_idx);
                         playing = true;
                         list_idx = prev_idx;
@@ -393,7 +427,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     //kind: KeyEventKind::Press,
                     ..
                 } => {
-                    send_json_command(&mut pipe, json!({"command": ["stop"]}))?;
+                    send_json_command(&mut pipe, pipe_name, json!({"command": ["stop"]}))?;
                     playing = false;
                     current_play_idx = None;
                 }
@@ -408,7 +442,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } => {
                     if volume < 200 {
                         volume += 5;
-                        send_json_command(&mut pipe, json!({"command": ["set_property", "volume", volume]}))?;
+                        send_json_command(&mut pipe, pipe_name, json!({"command": ["set_property", "volume", volume]}))?;
                     }
                 }
                 KeyEvent {
@@ -418,7 +452,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } => {
                     if volume > 0 {
                         volume -= 5;
-                        send_json_command(&mut pipe, json!({"command": ["set_property", "volume", volume]}))?;
+                        send_json_command(&mut pipe, pipe_name, json!({"command": ["set_property", "volume", volume]}))?;
                     }
                 }
                 KeyEvent {
@@ -427,7 +461,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ..
                 } => {
                     repeat = !repeat;
-                    send_json_command(&mut pipe, json!({"command": ["set_property", "loop-playlist", repeat]}))?;
+                    send_json_command(&mut pipe, pipe_name, json!({"command": ["set_property", "loop-playlist", repeat]}))?;
                 }
                 KeyEvent {
                     code: KeyCode::Char('o'),
