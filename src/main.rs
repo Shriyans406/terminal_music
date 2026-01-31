@@ -9,8 +9,8 @@ mod utils;
 use crate::app::AppState;
 //use crate::song::Song;
 use crate::music::scan_music;
-//use crate::mpv::{connect_pipe_with_retry, spawn_mpv_with_pipe};
-use crate::mpv::connect_pipe_with_retry;
+use crate::mpv::{connect_pipe_with_retry, spawn_mpv_with_pipe};
+//use crate::mpv::connect_pipe_with_retry;
 
 use ratatui::widgets::ListState;
 
@@ -27,6 +27,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Pipe name
     let pipe_name = r"\\.\pipe\mpvpipe";
+
+ // START MPV FIRST (THIS WAS MISSING)
+    let _mpv = spawn_mpv_with_pipe(pipe_name)?;
+
+    // Give mpv a moment to create the pipe
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+
 
     // Connect to mpv
     let mut pipe = connect_pipe_with_retry(pipe_name, 50, 100)?;

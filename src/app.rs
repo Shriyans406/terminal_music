@@ -1,11 +1,11 @@
 use std::{
-    io::stdout,
+    //io::stdout,
     time::Duration,
 };
 
 use crossterm::{
     event::{self, Event, KeyCode},
-    terminal::{disable_raw_mode, enable_raw_mode},
+    //terminal::{disable_raw_mode, enable_raw_mode},
 };
 
 use ratatui::{
@@ -18,7 +18,7 @@ use ratatui::{
 
 use crate::{
     song::Song,
-    ui::draw_ui,
+    //ui::draw_ui,
 };
 
 use ratatui::widgets::ListState;
