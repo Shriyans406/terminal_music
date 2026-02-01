@@ -31,7 +31,7 @@ use crate::online::search_online_songs;
 
 //use crate::online::search_online_songs;
 
-
+//use crossterm::event::KeyCode;
 
 pub struct AppState {
     pub songs: Vec<Song>,
@@ -94,7 +94,7 @@ last_input = Instant::now();
 
                 match key.code {
 
-                    use crossterm::event::KeyCode;
+                    
 
 
 
