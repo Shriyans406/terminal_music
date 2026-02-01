@@ -13,7 +13,7 @@ use crate::mpv::{connect_pipe_with_retry, spawn_mpv_with_pipe};
 //use crate::mpv::connect_pipe_with_retry;
 
 
-use crate::online::search_online_songs;
+//use crate::online::search_online_songs;
 
 
 
@@ -40,9 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::thread::sleep(std::time::Duration::from_millis(300));
 
 
-    let online = search_online_songs("love", "23d25192")?;
-println!("{:#?}", online);
-return Ok(());
+    //let online = search_online_songs("love", "23d25192")?;
+//println!("{:#?}", online);
+//return Ok(());
 
 
 
@@ -56,6 +56,10 @@ return Ok(());
         playing: false,
         volume: 50,
         repeat: false,
+
+         // 🔽 Phase 3 additions
+    search_mode: false,
+    search_query: String::new(),
     };
     app::run(&mut pipe, pipe_name, app)?;
     Ok(())

@@ -69,6 +69,7 @@ let artist = tag
             title,
             artist,
             album_art_path,
+            is_online: false,
         });
     }
 

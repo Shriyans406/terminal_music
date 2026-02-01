@@ -26,6 +26,13 @@ use ratatui::widgets::ListState;
 use crate::mpv::{PipeClient, send_json_command};
 use crate::utils::open_with_default;
 
+use crate::online::search_online_songs;
+
+
+//use crate::online::search_online_songs;
+
+
+
 pub struct AppState {
     pub songs: Vec<Song>,
     pub list_state: ListState,
@@ -33,6 +40,10 @@ pub struct AppState {
     pub playing: bool,
     pub volume: i64,
     pub repeat: bool,
+
+    // 🔽 NEW (Phase 3)
+    pub search_mode: bool,
+    pub search_query: String,
 }
 
 pub fn run(
@@ -68,6 +79,8 @@ pub fn run(
                 app.playing,
                 app.volume,
                 app.repeat,
+                &app.search_query, //NEW
+                app.search_mode,   //NEW
             );
         })?;
 
@@ -80,6 +93,9 @@ last_input = Instant::now();
 
 
                 match key.code {
+
+                    use crossterm::event::KeyCode;
+
 
 
                     
@@ -100,19 +116,32 @@ last_input = Instant::now();
                     }
 
                     KeyCode::Enter => {
-                        if let Some(i) = app.list_state.selected() {
-                            let path = app.songs[i].path.clone();
-                            send_json_command(
-                                pipe,
-                                _pipe_name,
-                                serde_json::json!({
-                                    "command": ["loadfile", path, "replace"]
-                                }),
-                            )?;
-                            app.current_play_idx = Some(i);
-                            app.playing = true;
-                        }
-                    }
+    if app.search_mode {
+        let results = search_online_songs(&app.search_query)?;
+
+        if !results.is_empty() {
+            app.songs = results;
+            app.list_state.select(Some(0));
+        }
+
+        app.search_mode = false;
+        app.search_query.clear();
+    } else {
+        if let Some(i) = app.list_state.selected() {
+            let path = app.songs[i].path.clone();
+            send_json_command(
+                pipe,
+                _pipe_name,
+                serde_json::json!({
+                    "command": ["loadfile", path, "replace"]
+                }),
+            )?;
+            app.current_play_idx = Some(i);
+            app.playing = true;
+        }
+    }
+}
+
 
 
                     KeyCode::Char(' ') => {
@@ -173,6 +202,34 @@ last_input = Instant::now();
                             }
                         }
                     }
+
+
+                    KeyCode::Char('/') => {
+    app.search_mode = true;
+    app.search_query.clear();
+}
+
+KeyCode::Char(c) if app.search_mode => {
+    app.search_query.push(c);
+}
+
+KeyCode::Backspace if app.search_mode => {
+    app.search_query.pop();
+}
+
+KeyCode::Esc if app.search_mode => {
+    app.search_mode = false;
+    app.search_query.clear();
+}
+
+//KeyCode::Esc if app.search_mode => {
+  //  app.search_mode = false;
+  //  app.search_query.clear();
+//}
+
+
+
+
 
                     _ => {}
                 }

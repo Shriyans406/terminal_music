@@ -12,9 +12,11 @@ pub fn draw_ui(
     songs: &Vec<Song>,
     list_state: &ListState,
     current_play_idx: Option<usize>,
-    playing: bool,
-    volume: i64,
-    repeat: bool,
+    _playing: bool,
+    _volume: i64,
+    _repeat: bool,
+    search_query: &str, // NEW
+    search_mode: bool,  // NEW
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -22,29 +24,43 @@ pub fn draw_ui(
         .split(area);
 
     // Now playing
-    let top_block = Block::default().borders(Borders::ALL).title(" Now Playing ");
-    let now_text: Vec<Line> = if let Some(idx) = current_play_idx {
-        let s = &songs[idx];
-        vec![
-            Line::from(Span::raw(format!("{} - {}", s.artist, s.title))),
-            Line::from(Span::raw(format!(
-                "Status: {}   Vol: {}%   Repeat: {}",
-                if playing { "Playing" } else { "Paused" },
-                volume,
-                if repeat { "On" } else { "Off" }
-            ))),
-        ]
-    } else {
-        vec![Line::from(Span::raw("Nothing playing"))]
-    };
-    let paragraph = Paragraph::new(now_text).block(top_block);
-    f.render_widget(paragraph, chunks[0]);
+    let top_block = Block::default()
+    .borders(Borders::ALL)
+    .title(" Search ");
+
+let search_text = if search_mode {
+    format!("> {}", search_query)
+} else {
+    "Press '/' to search music online".to_string()
+};
+
+let paragraph = Paragraph::new(search_text)
+    .block(top_block)
+    .style(
+        if search_mode {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default()
+        },
+    );
+
+f.render_widget(paragraph, chunks[0]);
+
 
     // Playlist + album art
     let bottom = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(65), Constraint::Percentage(35)].as_ref())
         .split(chunks[1]);
+
+
+        //new
+        let search = Paragraph::new(format!(
+    "Search: {}{}",
+    search_query,
+    if search_mode { "▌" } else { "" }
+));
+
 
     // Playlist
     let items: Vec<ListItem> = songs

@@ -1,12 +1,7 @@
+use crate::song::Song;
 use serde::Deserialize;
+use reqwest::blocking::Client;
 use std::error::Error;
-
-#[derive(Debug, Clone)]
-pub struct OnlineSong {
-    pub title: String,
-    pub artist: String,
-    pub stream_url: String,
-}
 
 #[derive(Debug, Deserialize)]
 struct JamendoResponse {
@@ -20,24 +15,25 @@ struct JamendoTrack {
     audio: String,
 }
 
-pub fn search_online_songs(
-    query: &str,
-    client_id: &str,
-) -> Result<Vec<OnlineSong>, Box<dyn Error>> {
+pub fn search_online_songs(query: &str) -> Result<Vec<Song>, Box<dyn Error>> {
+    let client_id = "23d25192"; // keep it here, internal
     let url = format!(
         "https://api.jamendo.com/v3.0/tracks/?client_id={}&format=json&limit=10&namesearch={}",
         client_id, query
     );
 
-    let response: JamendoResponse = reqwest::blocking::get(&url)?.json()?;
+    let client = Client::new();
+    let response: JamendoResponse = client.get(url).send()?.json()?;
 
     let songs = response
         .results
         .into_iter()
-        .map(|track| OnlineSong {
-            title: track.name,
-            artist: track.artist_name,
-            stream_url: track.audio,
+        .map(|t| Song {
+            title: t.name,
+            artist: t.artist_name,
+            path: t.audio, // streaming URL
+            is_online: true,
+            album_art_path: None,
         })
         .collect();
 
