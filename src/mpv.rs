@@ -2,11 +2,11 @@
 //use serde_json::Value;
 //use std::thread::sleep;
 
-use std::io::{self, Write, ErrorKind};
+use std::io::{ self, Write, ErrorKind };
 use std::process::Command;
 use std::time::Duration;
 
-pub use named_pipe::PipeClient;   // 🔑 REQUIRED
+pub use named_pipe::PipeClient; // 🔑 REQUIRED
 use serde_json::Value;
 
 pub fn spawn_mpv_with_pipe(pipe_name: &str) -> io::Result<std::process::Child> {
@@ -25,7 +25,7 @@ pub fn spawn_mpv_with_pipe(pipe_name: &str) -> io::Result<std::process::Child> {
 pub fn connect_pipe_with_retry(
     pipe_name: &str,
     tries: usize,
-    delay_ms: u64,
+    delay_ms: u64
 ) -> io::Result<PipeClient> {
     for _ in 0..tries {
         if let Ok(pipe) = PipeClient::connect(pipe_name) {
@@ -37,11 +37,7 @@ pub fn connect_pipe_with_retry(
     Err(io::Error::new(io::ErrorKind::Other, "Failed to connect pipe"))
 }
 
-pub fn send_json_command(
-    pipe: &mut PipeClient,
-    pipe_name: &str,
-    cmd: Value,
-) -> io::Result<()> {
+pub fn send_json_command(pipe: &mut PipeClient, pipe_name: &str, cmd: Value) -> io::Result<()> {
     let data = serde_json::to_vec(&cmd)?;
 
     match pipe.write_all(&data).and_then(|_| pipe.write_all(b"\n")) {

@@ -4,17 +4,13 @@ use std::{
 };
 
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{ self, Event, KeyCode },
     //terminal::{disable_raw_mode, enable_raw_mode},
 };
 
-use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
+use ratatui::{ backend::CrosstermBackend, Terminal };
 
 //use named_pipe::PipeClient;
-
 
 use crate::{
     song::Song,
@@ -23,11 +19,10 @@ use crate::{
 
 use ratatui::widgets::ListState;
 
-use crate::mpv::{PipeClient, send_json_command};
+use crate::mpv::{ PipeClient, send_json_command };
 use crate::utils::open_with_default;
 
 use crate::online::search_online_songs;
-
 
 //use crate::online::search_online_songs;
 
@@ -49,9 +44,9 @@ pub struct AppState {
 pub fn run(
     pipe: &mut PipeClient,
     _pipe_name: &str,
-    mut app: AppState,
+    mut app: AppState
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
+    use crossterm::terminal::{ enable_raw_mode, disable_raw_mode };
     use crossterm::execute;
     use std::io::stdout;
     use crate::ui::draw_ui;
@@ -66,7 +61,6 @@ pub fn run(
     use std::time::Instant;
     let mut last_input = Instant::now();
 
-
     loop {
         terminal.draw(|f| {
             let size = f.size();
@@ -80,26 +74,21 @@ pub fn run(
                 app.volume,
                 app.repeat,
                 &app.search_query, //NEW
-                app.search_mode,   //NEW
+                app.search_mode //NEW
             );
         })?;
 
         if event::poll(Duration::from_millis(200))? {
             if let Event::Key(key) = event::read()? {
                 if last_input.elapsed() < Duration::from_millis(150) {
-    continue;
-}
-last_input = Instant::now();
-
+                    continue;
+                }
+                last_input = Instant::now();
 
                 match key.code {
-
-                    
-
-
-
-                    
-                    KeyCode::Char('q') => break,
+                    KeyCode::Char('q') => {
+                        break;
+                    }
 
                     KeyCode::Down => {
                         let i = app.list_state.selected().unwrap_or(0);
@@ -116,56 +105,48 @@ last_input = Instant::now();
                     }
 
                     KeyCode::Enter => {
-    if app.search_mode {
-        let results = search_online_songs(&app.search_query)?;
+                        if app.search_mode {
+                            let results = search_online_songs(&app.search_query)?;
 
-        if !results.is_empty() {
-            app.songs = results;
-            app.list_state.select(Some(0));
-        }
+                            if !results.is_empty() {
+                                app.songs = results;
+                                app.list_state.select(Some(0));
+                            }
 
-        app.search_mode = false;
-        app.search_query.clear();
-    } else {
-        if let Some(i) = app.list_state.selected() {
-            let path = app.songs[i].path.clone();
-            send_json_command(
-                pipe,
-                _pipe_name,
-                serde_json::json!({
+                            app.search_mode = false;
+                            app.search_query.clear();
+                        } else {
+                            if let Some(i) = app.list_state.selected() {
+                                let path = app.songs[i].path.clone();
+                                send_json_command(
+                                    pipe,
+                                    _pipe_name,
+                                    serde_json::json!({
                     "command": ["loadfile", path, "replace"]
-                }),
-            )?;
-            app.current_play_idx = Some(i);
-            app.playing = true;
-        }
-    }
-}
-
-
+                })
+                                )?;
+                                app.current_play_idx = Some(i);
+                                app.playing = true;
+                            }
+                        }
+                    }
 
                     KeyCode::Char(' ') => {
-    send_json_command(
-        pipe,
-        _pipe_name,
-        serde_json::json!({
+                        send_json_command(
+                            pipe,
+                            _pipe_name,
+                            serde_json::json!({
             "command": ["cycle", "pause"]
-        }),
-    )?;
-    app.playing = !app.playing;
-}
-
-
-
-
-
-
+        })
+                        )?;
+                        app.playing = !app.playing;
+                    }
 
                     KeyCode::Char('+') => {
                         send_json_command(
                             pipe,
                             _pipe_name,
-                            serde_json::json!({"command": ["add", "volume", 5]}),
+                            serde_json::json!({"command": ["add", "volume", 5]})
                         )?;
                         app.volume += 5;
                     }
@@ -174,26 +155,20 @@ last_input = Instant::now();
                         send_json_command(
                             pipe,
                             _pipe_name,
-                            serde_json::json!({"command": ["add", "volume", -5]}),
+                            serde_json::json!({"command": ["add", "volume", -5]})
                         )?;
                         app.volume -= 5;
                     }
 
-
                     KeyCode::Char('r') => {
-    app.repeat = !app.repeat;
-    let loop_cmd = if app.repeat {
-        serde_json::json!({"command": ["set_property", "loop-file", "inf"]})
-    } else {
-        serde_json::json!({"command": ["set_property", "loop-file", "no"]})
-    };
-    send_json_command(pipe, _pipe_name, loop_cmd)?;
-}
-
-
-
-
-
+                        app.repeat = !app.repeat;
+                        let loop_cmd = if app.repeat {
+                            serde_json::json!({"command": ["set_property", "loop-file", "inf"]})
+                        } else {
+                            serde_json::json!({"command": ["set_property", "loop-file", "no"]})
+                        };
+                        send_json_command(pipe, _pipe_name, loop_cmd)?;
+                    }
 
                     KeyCode::Char('o') => {
                         if let Some(i) = app.current_play_idx {
@@ -203,33 +178,28 @@ last_input = Instant::now();
                         }
                     }
 
-
                     KeyCode::Char('/') => {
-    app.search_mode = true;
-    app.search_query.clear();
-}
+                        app.search_mode = true;
+                        app.search_query.clear();
+                    }
 
-KeyCode::Char(c) if app.search_mode => {
-    app.search_query.push(c);
-}
+                    KeyCode::Char(c) if app.search_mode => {
+                        app.search_query.push(c);
+                    }
 
-KeyCode::Backspace if app.search_mode => {
-    app.search_query.pop();
-}
+                    KeyCode::Backspace if app.search_mode => {
+                        app.search_query.pop();
+                    }
 
-KeyCode::Esc if app.search_mode => {
-    app.search_mode = false;
-    app.search_query.clear();
-}
+                    KeyCode::Esc if app.search_mode => {
+                        app.search_mode = false;
+                        app.search_query.clear();
+                    }
 
-//KeyCode::Esc if app.search_mode => {
-  //  app.search_mode = false;
-  //  app.search_query.clear();
-//}
-
-
-
-
+                    //KeyCode::Esc if app.search_mode => {
+                    //  app.search_mode = false;
+                    //  app.search_query.clear();
+                    //}
 
                     _ => {}
                 }
@@ -241,4 +211,3 @@ KeyCode::Esc if app.search_mode => {
     execute!(stdout(), crossterm::terminal::LeaveAlternateScreen)?;
     Ok(())
 }
-
